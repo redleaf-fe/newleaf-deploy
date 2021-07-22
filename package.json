@@ -10,7 +10,9 @@
     "pretty": "prettier --write middlewares/* models/* routes/* services/* utils/*"
   },
   "dependencies": {
+    "adm-zip": "^0.5.5",
     "axios": "^0.21.1",
+    "fs-extra": "9",
     "redis": "^3.1.2"
   },
   "devDependencies": {
@@ -23,5 +25,8 @@
     "commitizen": {
       "path": "./node_modules/cz-conventional-changelog"
     }
+  },
+  "engines": {
+    "node": ">=10.22.0"
   }
 }
