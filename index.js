@@ -8,7 +8,7 @@ const { redisPromisify } = require("./utils");
 const config = require("./env.json");
 const redisKey = require("./redisKey");
 
-async function deploy({ publishId, commit, appName, distPath }) {
+function deploy({ publishId, commit, appName, distPath }) {
   const zipFilePath = path.resolve(
     config.appDir,
     `${appName}-${commit}-dist-nomap.zip`
@@ -17,35 +17,49 @@ async function deploy({ publishId, commit, appName, distPath }) {
     config.appDir,
     `${appName}-${commit}-dist-nomap`
   );
-  const res = await axios({
+  axios({
     url: `${config.centerServer}/publish/getShouldPublish`,
-    method: "get",
+    method: "post",
     headers: { "Content-Type": "application/json" },
     data: {
-      address: config.deployAddress,
+      address: `${config.deployAddress}:${config.appDir}`,
       id: publishId,
     },
-  });
+  })
+    .then((res) => {
+      if (+res.data.id === +publishId) {
+        if (!fs.existsSync(zipFilePath)) {
+          return;
+        }
+        const zip = new AdmZip(zipFilePath);
+        zip.extractAllTo(extractFilePath, true);
+        fs.removeSync(distPath);
+        fs.copySync(extractFilePath, distPath);
 
-  if (res.shouldPub) {
-    if (!fs.existsSync(zipFilePath)) {
-      return;
-    }
-    const zip = new AdmZip(zipFilePath);
-    zip.extractAllTo(extractFilePath, true);
-    fs.removeSync(distPath);
-    fs.copySync(extractFilePath, distPath);
-
-    axios({
-      url: `${config.centerServer}/publish/publishResult`,
-      method: "get",
-      headers: { "Content-Type": "application/json" },
-      data: {
-        address: config.deployAddress,
-        id: publishId,
-      },
+        axios({
+          url: `${config.centerServer}/publish/publishResult`,
+          method: "post",
+          headers: { "Content-Type": "application/json" },
+          data: {
+            address: `${config.deployAddress}:${config.appDir}`,
+            id: publishId,
+          },
+        }).catch((e) => {
+          fs.writeFileSync(
+            path.resolve(config.appDir, `${appName}-${commit}.log`),
+            JSON.stringify(e),
+            { flag: "a" }
+          );
+        });
+      }
+    })
+    .catch((e) => {
+      fs.writeFileSync(
+        path.resolve(config.appDir, `${appName}-${commit}.log`),
+        JSON.stringify(e),
+        { flag: "a" }
+      );
     });
-  }
 }
 
 function main() {
@@ -63,7 +77,7 @@ function main() {
 
   client.subscribe(redisKey.deployChannel);
 
-  client.on("message", async function (channel, value) {
+  client.on("message", function (channel, value) {
     if (channel !== redisKey.deployChannel) {
       return;
     }
@@ -75,7 +89,7 @@ function main() {
       return;
     }
 
-    await deploy({ publishId, commit, appName, distPath });
+    deploy({ publishId, commit, appName, distPath });
   });
 }
 
