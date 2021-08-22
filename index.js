@@ -4,7 +4,6 @@ const redis = require("redis");
 const axios = require("axios");
 const AdmZip = require("adm-zip");
 
-const { redisPromisify } = require("./utils");
 const config = require("./env.json");
 const redisKey = require("./redisKey");
 
@@ -73,7 +72,6 @@ function main() {
     host: config.redisHost,
     port: config.redisPort,
   });
-  redisPromisify(client);
 
   client.subscribe(redisKey.deployChannel);
 
